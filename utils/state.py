@@ -5,49 +5,58 @@ class GameState:
         self.obs = obs
 
     @property
+    def player(self):
+        return self.obs.get("player", 0)
+
+    @property
     def current_day(self):
-        return self.obs.get("current_day", 0)
+        return self.obs.get("day", 0)
 
     @property
     def current_hour(self):
-        return self.obs.get("current_hour", 0)
+        return self.obs.get("hour", 0)
 
     @property
     def my_farm(self):
-        return self.obs.get("my_farm", {})
+        farms = self.obs.get("farms", [])
+        if isinstance(farms, dict):
+            return farms.get(str(self.player), farms.get(self.player, {}))
+        elif isinstance(farms, list) and len(farms) > self.player:
+            return farms[self.player]
+        return {}
 
     @property
     def my_money(self):
-        return self.obs.get("my_money", 0)
+        return self.my_farm.get("money", 3000)
 
     @property
     def my_tiles(self):
-        # 2D list of tiles representing the 10x10 board
-        return self.obs.get("my_tiles", [[{} for _ in range(BOARD_SIZE)] for _ in range(BOARD_SIZE)])
+        return self.my_farm.get("tiles", [[{} for _ in range(BOARD_SIZE)] for _ in range(BOARD_SIZE)])
 
     @property
     def farmer_pos(self):
-        return self.obs.get("farmer_pos", (0, 0))
+        pos = self.my_farm.get("farmer", [0, 0])
+        return tuple(pos) if isinstance(pos, list) else pos
 
     @property
     def shed_contents(self):
-        return self.obs.get("shed_contents", {})
+        return self.obs.get("private", {}).get("shed", {})
 
     @property
     def seed_counts(self):
-        return self.obs.get("seed_counts", {})
+        return self.obs.get("private", {}).get("seeds", {})
 
     @property
     def inventories(self):
-        return self.obs.get("inventories", {})
+        return self.obs.get("private", {}).get("inventories", {})
 
     @property
     def market_prices(self):
-        return self.obs.get("market_prices", {})
+        return self.obs.get("market", {}).get("prices", {})
 
     @property
     def market_inventory(self):
-        return self.obs.get("market_inventory", {})
+        return self.obs.get("market", {}).get("inventory", {})
 
     @property
     def unlocked_shops(self):
@@ -56,8 +65,12 @@ class GameState:
     def get_tile(self, x, y):
         """Returns the tile dict at (x, y)."""
         if 0 <= x < BOARD_SIZE and 0 <= y < BOARD_SIZE:
-            return self.my_tiles[y][x]
-        return None
+            try:
+                # If tiles is a flat list in some versions, this might fail, assuming 2D list
+                return self.my_tiles[y][x]
+            except (IndexError, KeyError, TypeError):
+                pass
+        return {}
 
     def is_shed_adjacent(self, x, y):
         """Returns True if the given tile is adjacent to any shed position."""
@@ -93,6 +106,7 @@ class GameState:
                     quad_y = y // (BOARD_SIZE // 2)
                     quadrant_idx = quad_y * 2 + quad_x
                     
-                    if quadrant_idx in unlocked_quads and (x, y) not in SHED_POSITIONS:
-                        found.append((x, y))
+                    if not unlocked_quads or quadrant_idx in unlocked_quads:
+                        if (x, y) not in SHED_POSITIONS:
+                            found.append((x, y))
         return found
