@@ -20,7 +20,7 @@ def run_quick_test():
     env = make("kaggriculture", configuration={"episodeSteps": 72}, debug=True)
     
     try:
-        env.run([agent, "random"])
+        env.run([agent, agent])
         final = env.steps[-1]
         
         our_score = final[0].reward if final[0].reward is not None else 0
@@ -30,11 +30,11 @@ def run_quick_test():
         print(f"Random Agent Score: ${rand_score:.0f}")
         
         if our_score > rand_score:
-            print("Result: WIN 🎉")
+            print("Result: WIN")
         elif our_score < rand_score:
-            print("Result: LOSE 😢")
+            print("Result: LOSE")
         else:
-            print("Result: TIE 🤝")
+            print("Result: TIE")
             
         print(f"Turns completed: {len(env.steps)}")
     except Exception as e:
@@ -114,11 +114,11 @@ def run_vs_starter():
         print(f"Starter Agent Score: ${starter_score:.0f}")
         
         if our_score > starter_score:
-            print("Result: WIN 🎉")
+            print("Result: WIN")
         elif our_score < starter_score:
-            print("Result: LOSE 😢")
+            print("Result: LOSE")
         else:
-            print("Result: TIE 🤝")
+            print("Result: TIE")
     except Exception as e:
         print(f"Error running against starter (may not exist natively in env): {e}")
 

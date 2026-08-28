@@ -29,31 +29,49 @@ def agent(obs):
     x, y = farmer_pos
     tile = state.get_tile(x, y)
     
-    if tile:
-        kind = tile.get("kind", "empty")
+    if isinstance(tile, str):
+        if tile == "LOCKED":
+            kind = "locked"
+        else:
+            kind = "plant"
+    elif isinstance(tile, dict):
+        kind = tile.get("kind", "plant")
+    elif tile is None:
+        kind = "empty"
+    else:
+        kind = "unknown"
         
-        # 3. If standing on a PLANT tile
-        if kind in ("crop", "plant"):
+    # 3. If standing on a PLANT tile
+    if kind == "plant":
+        if isinstance(tile, dict):
             watered = tile.get("watered_today", False)
             yield_units = tile.get("yield_units", 0)
             age = tile.get("growth", 0)
+        else:
+            watered = False
+            yield_units = 1
+            age = 2
             
-            if not watered and tile.get("water", 1) == 0:
-                action = "WATER"
-            elif yield_units > 0 and age >= 2:
-                action = "HARVEST"
+        if not watered:
+            action = "WATER"
+        elif yield_units > 0 and age >= 2:
+            action = "HARVEST"
                 
-        # 2. If standing on empty tile and have wheat seeds: PLANT WHEAT
-        elif kind == "empty":
-            if state.seed_counts.get("WHEAT", 0) > 0:
-                action = "PLANT_WHEAT"
+    # 2. If standing on empty tile and have wheat seeds: PLANT WHEAT
+    elif kind == "empty":
+        if state.seed_counts.get("WHEAT", 0) > 0:
+            action = "PLANT_WHEAT"
                 
     # 5. Otherwise: move SOUTH then EAST to explore tiles
     if action == "PASS":
-        if hour % 2 == 0:
+        if y < 4 and hour % 2 == 0:
             action = "SOUTH"
-        else:
+        elif x < 4 and hour % 2 == 1:
             action = "EAST"
+        elif y > 0:
+            action = "NORTH"
+        elif x > 0:
+            action = "WEST"
             
     # Format return dictionary exactly as specified
     action_dict = {
