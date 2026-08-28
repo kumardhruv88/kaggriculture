@@ -13,7 +13,7 @@ def agent(obs):
     money = state.my_money
     farmer_pos = state.farmer_pos
     
-    action = "PASS"
+    action = ["PASS"]
     market_orders = []
     
     # 1. Turn 0: market order BUY_SEED WHEAT 5
@@ -53,34 +53,34 @@ def agent(obs):
             age = 2
             
         if not watered:
-            action = "WATER"
+            action = ["WATER"]
         elif yield_units > 0 and age >= 2:
-            action = "HARVEST"
+            action = ["HARVEST"]
                 
     # 2. If standing on empty tile and have wheat seeds: PLANT WHEAT
-    elif kind == "empty":
+    elif kind == "empty" and (x, y) not in [(4, 4), (5, 4), (4, 5), (5, 5)]:
         if state.seed_counts.get("WHEAT", 0) > 0:
-            action = "PLANT_WHEAT"
+            action = ["PLANT", "WHEAT"]
                 
-    # 5. Otherwise: move SOUTH then EAST to explore tiles
-    if action == "PASS":
+    # 5. Otherwise: move within NW quadrant (0-4, 0-4) to explore
+    if action == ["PASS"]:
         if y < 4 and hour % 2 == 0:
-            action = "SOUTH"
+            action = ["SOUTH"]
         elif x < 4 and hour % 2 == 1:
-            action = "EAST"
+            action = ["EAST"]
         elif y > 0:
-            action = "NORTH"
+            action = ["NORTH"]
         elif x > 0:
-            action = "WEST"
+            action = ["WEST"]
             
     # Format return dictionary exactly as specified
     action_dict = {
-        "farmer": [action],
+        "farmer": action,
         "hands": [],
         "market": market_orders
     }
     
-    print(f"Day {day:02d} Hr {hour:02d} | Pos: {farmer_pos} | Act: {action} | Money: {money}")
+    print(f"Day {day:02d} Hr {hour:02d} | Pos: {farmer_pos} | Act: {action} | Money: {money} | Seeds: {state.seed_counts}")
     
     return action_dict
 
