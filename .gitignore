@@ -1,4 +1,12 @@
 __pycache__/
 *.pyc
+replays/
 .env
-.vscode/
+*.tar.gz
+logs/
+.kaggle/
+venv/
+.venv/
+*.egg-info/
+dist/
+.DS_Store
