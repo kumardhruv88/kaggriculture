@@ -1,94 +1,64 @@
-import sys
-from utils.state import GameState
+AGENT_STATE = {}
 
 def agent(obs):
-    """
-    Minimal Working Agent for Kaggriculture.
-    Returns: {"farmer": ["ACTION"], "hands": [], "market": [["ORDER", "ITEM", QTY]]}
-    """
-    state = GameState(obs)
+    player = obs["player"]
+    me = obs["farms"][player]
+    private = obs["private"]
+    day = obs["day"]
+    hour = obs["hour"]
+    fx, fy = me["farmer"]
+    tile = me["tiles"][fy][fx]
+    money = me["money"]
     
-    day = state.current_day
-    hour = state.current_hour
-    money = state.my_money
-    farmer_pos = state.farmer_pos
+    market = []
     
-    action = ["PASS"]
-    market_orders = []
+    # Buy wheat seeds if we have none
+    if private["seeds"].get("WHEAT", 0) < 3 and money >= 10:
+        market.append(["BUY_SEED", "WHEAT", 5])
     
-    # 1. Turn 0: market order BUY_SEED WHEAT 5
-    if day == 0 and hour == 0:
-        market_orders.append(["BUY_SEED", "WHEAT", 5])
-        
-    # 4. If shed has wheat > 0: market order SELL WHEAT <qty>
-    wheat_in_shed = state.shed_contents.get("WHEAT", 0)
-    if wheat_in_shed > 0:
-        market_orders.append(["SELL", "WHEAT", wheat_in_shed])
-        
-    # Get current tile
-    x, y = farmer_pos
-    tile = state.get_tile(x, y)
+    # Sell wheat in shed
+    wheat_shed = private["shed"].get("WHEAT", 0)
+    if wheat_shed > 0:
+        market.append(["SELL", "WHEAT", wheat_shed])
     
-    if isinstance(tile, str):
-        if tile == "LOCKED":
-            kind = "locked"
-        else:
-            kind = "plant"
-    elif isinstance(tile, dict):
-        kind = tile.get("kind", "plant")
-    elif tile is None:
-        kind = "empty"
-    else:
-        kind = "unknown"
-        
-    # 3. If standing on a PLANT tile
-    if kind == "plant":
-        if isinstance(tile, dict):
-            watered = tile.get("watered_today", False)
-            yield_units = tile.get("yield_units", 0)
-            age = tile.get("growth", 0)
-        else:
-            watered = False
-            yield_units = 1
-            age = 2
-            
-        if not watered:
-            action = ["WATER"]
-        elif yield_units > 0 and age >= 2:
-            action = ["HARVEST"]
-                
-    # 2. If standing on empty tile and have wheat seeds: PLANT WHEAT
-    elif kind == "empty" and (x, y) not in [(4, 4), (5, 4), (4, 5), (5, 5)]:
-        if state.seed_counts.get("WHEAT", 0) > 0:
-            action = ["PLANT", "WHEAT"]
-                
-    # 5. Otherwise: move within NW quadrant (0-4, 0-4) to explore
-    if action == ["PASS"]:
-        if y < 4 and hour % 2 == 0:
-            action = ["SOUTH"]
-        elif x < 4 and hour % 2 == 1:
-            action = ["EAST"]
-        elif y > 0:
-            action = ["NORTH"]
-        elif x > 0:
-            action = ["WEST"]
-            
-    # Format return dictionary exactly as specified
-    action_dict = {
-        "farmer": action,
-        "hands": [],
-        "market": market_orders
-    }
+    print(f"Day {day:02d} Hr {hour:02d} | Pos: ({fx},{fy}) | Money: {money:.0f} | Tile: {tile}")
     
-    print(f"Day {day:02d} Hr {hour:02d} | Pos: {farmer_pos} | Act: {action} | Money: {money} | Seeds: {state.seed_counts}")
+    # If on empty unlocked tile and have seeds: plant
+    if tile is None and private["seeds"].get("WHEAT", 0) > 0:
+        return {"farmer": ["PLANT", "WHEAT"], "hands": [], "market": market}
     
-    return action_dict
-
-if __name__ == "__main__":
-    try:
-        from kaggle_environments import make
-        env = make("kaggriculture", configuration={"episodeSteps": 720}, debug=True)
-        env.run([agent, "random"])
-        print("Final Rewards:", env.steps[-1][0].reward, env.steps[-1][1].reward)
-    except ImportError:
-        print("kaggle_environments not installed, skipping test.")
+    # If on a plant
+    if isinstance(tile, dict) and tile.get("kind") == "PLANT":
+        age = day - tile.get("planted_day", day)
+        if tile.get("yield_units", 0) > 0 and age >= 2:
+            return {"farmer": ["HARVEST"], "hands": [], "market": market}
+        if not tile.get("watered_today", False):
+            return {"farmer": ["WATER"], "hands": [], "market": market}
+    
+    # If on weed: dig it
+    if isinstance(tile, dict) and tile.get("kind") == "WEED":
+        return {"farmer": ["DIG"], "hands": [], "market": market}
+    
+    # Move to explore — go south then wrap east
+    board = me["tiles"]
+    # Find nearest empty or plant tile
+    for dy in range(10):
+        for dx in range(10):
+            nx, ny = (fx + dx) % 10, (fy + dy) % 10
+            t = board[ny][nx]
+            if t == "LOCKED":
+                continue
+            if t is None and private["seeds"].get("WHEAT", 0) > 0:
+                # move toward it
+                if ny > fy: return {"farmer": ["SOUTH"], "hands": [], "market": market}
+                if ny < fy: return {"farmer": ["NORTH"], "hands": [], "market": market}
+                if nx > fx: return {"farmer": ["EAST"], "hands": [], "market": market}
+                if nx < fx: return {"farmer": ["WEST"], "hands": [], "market": market}
+            if isinstance(t, dict) and t.get("kind") == "PLANT":
+                if not t.get("watered_today", False) or t.get("yield_units", 0) > 0:
+                    if ny > fy: return {"farmer": ["SOUTH"], "hands": [], "market": market}
+                    if ny < fy: return {"farmer": ["NORTH"], "hands": [], "market": market}
+                    if nx > fx: return {"farmer": ["EAST"], "hands": [], "market": market}
+                    if nx < fx: return {"farmer": ["WEST"], "hands": [], "market": market}
+    
+    return {"farmer": ["PASS"], "hands": [], "market": market}
